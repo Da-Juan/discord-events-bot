@@ -1,0 +1,26 @@
+# Default event location for events in calendar that does not have a location set
+default_location: Sanata Claus Village 96930 Rovaniemi, Finland
+# ICS calendar URL
+calendar_url: https://example.org/calendar.ics
+# The inverval before the bot id run again (defaults to 24h)
+# Valid time units are "s", "m", "h"
+run_interval: 24h
+
+discord:
+  # Discord bot token
+  token: XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+  # Discord bot OAuth2 URL
+  bot_url: https://discord.com/oauth2/authorize?client_id=000000000000000000&permissions=0000000000&scope=bot
+  # Discord server ID
+  server_id: 000000000000000000
+  # Send a message when an event is created
+  # If this section is omitted, no message will be sent
+  message:
+    # Message content
+    content: Yo dawg! There's a new event!
+    # Send a message in this channel when an event is created
+    channel: general
+    # Add a link to the event in the message (yes, no)
+    link: no
+    # Mention @everyone when the message is sent (yes, no)
+    mention_everyone: no

@@ -1,0 +1,24 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+ics = "*"
+requests = "*"
+pyyaml = "*"
+schedule = "*"
+
+[dev-packages]
+flake8 = "*"
+flake8-import-order = "*"
+flake8-colors = "*"
+flake8-bugbear = "*"
+black = "*"
+pylint = "*"
+mypy = "*"
+types-requests = "*"
+types-pyyaml = "*"
+
+[requires]
+python_version = "3.10"

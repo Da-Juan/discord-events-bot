@@ -1,0 +1,8 @@
+.git
+CHANGELOG.md
+LICENSE
+README.md
+handler.py
+*.egg-info
+*.yaml
+*.zip

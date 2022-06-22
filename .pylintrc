@@ -1,0 +1,6 @@
+[FORMAT]
+max-line-length=240
+
+[Messages Control]
+# We use flake8 for import order
+disable=missing-module-docstring,wrong-import-order
