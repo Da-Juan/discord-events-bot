@@ -27,7 +27,7 @@ This bot imports automatically events from an iCal calendar into Discord and, op
 Finally, fetch your guild ID by navigating to the server where you installed your app. Copy the first number in the URL after channels/ (for example, in the URL https://discord.com/channels/12345/678910, the guild ID would be 12345)
 
 ### Docker
-You also need a way to run a Docker container see [Docker's official documentation](https://docs.docker.com/get-docker/)
+You also need a way to run a Docker container see [Docker's official documentation](https://docs.docker.com/engine/install/#server)
 
 ### Calendar URL
 The bot reads a calendar in iCal format, here are the steps to get the URL for a Google Calendar:
