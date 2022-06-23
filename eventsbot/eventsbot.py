@@ -22,17 +22,18 @@ import schedule
 
 import yaml
 
+from .constants import (
+    DEFAULT_CHANNEL,
+    DEFAULT_EVENT_LOCATION,
+    DEFAULT_INTERVAL,
+    DEFAULT_MESSAGE,
+    DEFAULT_MESSAGE_HISTORY,
+    DISCORD_SHORT_URL,
+    ENV_PREFIX,
+)
 from .discord import DiscordGuild, Event
+from .history import check_history, load_history, save_history
 from .utils import duration_to_seconds
-
-DEFAULT_CHANNEL = "general"
-DEFAULT_EVENT_LOCATION = "Sanata Claus Village 96930 Rovaniemi, Finland"
-DEFAULT_INTERVAL = "24h"
-DEFAULT_MESSAGE = "A new event was added"
-
-DISCORD_SHORT_URL = "https://discord.gg"
-
-ENV_PREFIX = "eventsbot_"
 
 # We cannot access return values from a scheduled function
 # The solution is to use a global variable
@@ -67,11 +68,12 @@ def get_this_week_events(url: str, default_location: str) -> list[Event]:
         location = event.decoded("location") if event.decoded("location") else default_location
         events.append(
             Event(
-                event.get("summary"),
-                event.get("description"),
-                event.decoded("dtstart").astimezone(pytz.utc).isoformat(),
-                event.decoded("dtend").astimezone(pytz.utc).isoformat(),
-                {"location": location},
+                id=None,
+                name=event.get("summary"),
+                description=event.get("description"),
+                start_time=event.decoded("dtstart").astimezone(pytz.utc).isoformat(),
+                end_time=event.decoded("dtend").astimezone(pytz.utc).isoformat(),
+                metadata={"location": location},
             )
         )
     return events
@@ -99,10 +101,17 @@ def check_config(config: dict, mode: ConfigMode) -> None:
                 else:
                     msg = f"Missing '{ENV_PREFIX + option}' environment variable."
                 raise KeyError(msg)
-    optional_values = {"default_location": DEFAULT_EVENT_LOCATION, "run_interval": DEFAULT_INTERVAL}
+
+    optional_values = {
+        "default_location": DEFAULT_EVENT_LOCATION,
+        "run_interval": DEFAULT_INTERVAL,
+        "history_path": DEFAULT_MESSAGE_HISTORY,
+    }
     for key, value in optional_values.items():
         if key not in config:
             config[key] = value
+
+    check_history(config["history_path"])
 
 
 def load_config(config_path: pathlib.Path) -> dict:
@@ -138,7 +147,7 @@ def signal_handler(sig: int, _) -> None:
     sys.exit()
 
 
-def send_message(guild: DiscordGuild, message: dict, event_id: str) -> None:
+def send_message(guild: DiscordGuild, message: dict, event_id: str) -> tuple[str, str]:
     """Send a message to announce a new event."""
 
     channel = message.get("channel", DEFAULT_CHANNEL)
@@ -153,7 +162,22 @@ def send_message(guild: DiscordGuild, message: dict, event_id: str) -> None:
         content += f" {DISCORD_SHORT_URL}/{guild.create_invite(channel)}?event={event_id}"
 
     logger.info("Sending message on channel %s.", channel)
-    guild.create_message(channel, content, message.get("mention_everyone", False))
+    return guild.create_message(channel, content, message.get("mention_everyone", False))
+
+
+def cleanup_old_messages(guild: DiscordGuild, history: list[dict[str, str]]) -> list[dict[str, str]]:
+    """Delete obsolete events messages."""
+
+    deleted_messages = []
+    for message in history:
+        if not guild.event_id_exists(message["event_id"]):
+            guild.delete_message(message["channel_id"], message["message_id"])
+            deleted_messages.append(message)
+
+    deleted_count = len(deleted_messages)
+    if deleted_count > 0:
+        logger.info("%s obsolete message%s deleted", deleted_count, "s" if deleted_count > 1 else "")
+    return [message for message in history if message not in deleted_messages]
 
 
 def update_events(config: dict, guild: DiscordGuild) -> None:
@@ -167,13 +191,19 @@ def update_events(config: dict, guild: DiscordGuild) -> None:
         logger.error("Unable to load calendar %s\n%s", config["calendar_url"], exc)
         return
 
+    history = load_history(config["history_path"])
+
     if not events:
         logger.info("No upcoming events found this week")
+        history = cleanup_old_messages(guild, history)
+        save_history(config["history_path"], history)
         return
 
     logger.info("Upcoming events this week:")
     for event in events:
         logger.info("\t- %s (%s - %s)", event.name, event.start_time, event.end_time)
+
+    sent_messages = []
 
     for event in events:
         if event in guild.events:
@@ -185,7 +215,13 @@ def update_events(config: dict, guild: DiscordGuild) -> None:
 
         message = config["discord"].get("message", {})
         if message:
-            send_message(guild, message, event_id)
+            message_id, channel_id = send_message(guild, message, event_id)
+            sent_messages.append({"event_id": event_id, "message_id": message_id, "channel_id": channel_id})
+
+    history += sent_messages
+
+    history = cleanup_old_messages(guild, history)
+    save_history(config["history_path"], history)
 
 
 def run(config: dict) -> int:

@@ -1,6 +1,7 @@
 # Discord events bot
 
 This bot imports automatically events from an iCal calendar into Discord and, optionally, sends a message to inform the server's users about the event.
+It also automatically deletes the messages posted about finished events.
 
 ## Pre-requisites
 
@@ -80,6 +81,7 @@ This is an early test feature.
 | `eventsbot_default_location` | `default_location`                 |
 | `eventsbot_calendar_url`     | `calendar_url`                     |
 | `eventsbot_run_interval`     | `run_interval`                     |
+| `eventsbot_history_path`     | `history_path`                     |
 | `eventsbot_token`            | `discord.token`                    |
 | `eventsbot_bot_url`          | `discord.bot_url`                  |
 | `eventsbot_server_id`        | `discord.server_id`                |
