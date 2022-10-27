@@ -17,8 +17,9 @@ RUN mkdir /app
 WORKDIR /app
 
 # Install python dependencies in .venv
-COPY . .
+COPY Pipfile* /app/
 RUN PIPENV_VENV_IN_PROJECT=1 pipenv install --deploy
+COPY . .
 RUN /app/.venv/bin/pip install .
 
 

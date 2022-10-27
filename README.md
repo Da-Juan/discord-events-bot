@@ -50,7 +50,7 @@ Copy `example_config.yaml` as `config.yaml` and adapt it with your settings.
 Run the bot with Docker:
 
 ```bash
-docker run -d -mount type=bind,source=<absolute_path_to_config.yaml>,target=/config.yaml,readonly nrouanet/eventsbot
+docker run -d --name eventsbot --mount type=bind,source=<absolute_path_to_config.yaml>,target=/config.yaml,readonly nrouanet/eventsbot
 ```
 
 ## References
