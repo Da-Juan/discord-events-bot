@@ -31,6 +31,19 @@ class Event:
     metadata: dict[str, str]
     privacy_level: int = 2
 
+    def __eq__(self, other) -> bool:    
+        if not isinstance(other, Event):    
+            # don't attempt to compare against unrelated types    
+            return NotImplemented    
+            
+        return (    
+            self.name == other.name    
+            and self.start_time == other.start_time    
+            and self.end_time == other.end_time    
+            and self.metadata == other.metadata    
+            and self.privacy_level == other.privacy_level    
+        )    
+
 
 class DiscordGuildError(Exception):
     """Base exception class."""
