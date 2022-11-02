@@ -3,6 +3,7 @@ import json
 import logging
 import sys
 from dataclasses import dataclass
+from time import sleep
 from typing import Any
 
 import requests
@@ -49,14 +50,34 @@ class DiscordGuildError(Exception):
     """Base exception class."""
 
 
-def _api_request(url: str, method: str, headers: None | dict = None, data: None | str = None):
+def _api_request(
+    url: str,
+    method: str,
+    headers: None | dict = None,
+    data: None | str = None,
+    expected_status: None | int = 200,
+    error_ok: bool = False,
+) -> tuple[int, dict]:
     """Manage API requests."""
     response = requests.request(method, url, headers=headers, data=data)
     logger.debug("API response code: %s", response.status_code)
     logger.debug("API response content: %s", response.content)
-    response.raise_for_status()
-    assert response.status_code == 200
-    return response.json()
+
+    if response.status_code == 429:
+        if "X-RateLimit-Reset-After" in response.headers:
+            seconds = float(response.headers.get("X-RateLimit-Reset-After", 0))
+            logger.info("Rate limiting hit, waiting for %s seconds", seconds)
+            sleep(seconds)
+            return _api_request(url, method, headers, data, expected_status, error_ok)
+
+    if not error_ok:
+        response.raise_for_status()
+        assert response.status_code == expected_status
+
+    try:
+        return response.status_code, response.json()
+    except requests.exceptions.JSONDecodeError:
+        return response.status_code, {}
 
 
 class DiscordGuild:
@@ -81,7 +102,8 @@ class DiscordGuild:
         """Refresh the list of guild events."""
         url = f"{self.base_api_url}/guilds/{self.guild_id}/scheduled-events"
         events = []
-        for event in _api_request(url, "GET", self.headers):
+        _, response = _api_request(url, "GET", self.headers)
+        for event in response:
             events.append(
                 Event(
                     event["name"],
@@ -98,10 +120,11 @@ class DiscordGuild:
         """Refresh the list of guild channels."""
 
         url = f"{self.base_api_url}/guilds/{self.guild_id}/channels"
-        response = []
-        for channel in _api_request(url, "GET", self.headers):
-            response.append(Channel(channel["name"], channel["id"]))
-        self._channels = response
+        channels = []
+        _, response = _api_request(url, "GET", self.headers)
+        for channel in response:
+            channels.append(Channel(channel["name"], channel["id"]))
+        self._channels = channels
         self._channels_last_pull = datetime.datetime.now().timestamp()
 
     @property
@@ -149,7 +172,8 @@ class DiscordGuild:
             }
         )
 
-        scheduled_event = _api_request(url, "POST", self.headers, data)
+        _, scheduled_event = _api_request(url, "POST", self.headers, data)
+        self._refresh_events()
         return scheduled_event["id"]
 
     def create_message(self, channel: str, content: str, mention_everyone: None | bool = False) -> None:
@@ -170,5 +194,5 @@ class DiscordGuild:
         url = f"{self.base_api_url}/channels/{self.get_channel_id(channel)}/invites"
         data = json.dumps({"max_age": max_age})
 
-        invite = _api_request(url, "POST", self.headers, data)
+        _, invite = _api_request(url, "POST", self.headers, data)
         return invite["code"]
