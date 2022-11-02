@@ -6,17 +6,19 @@ import re
 import signal
 import sys
 import time
+from datetime import datetime, timedelta
 from enum import Enum, auto
+from typing import Any
 
-import arrow
+import icalendar
 
-import ics
+import pytz
+
+import recurring_ical_events
 
 import requests
 
 import schedule
-
-import tatsu
 
 import yaml
 
@@ -34,7 +36,7 @@ ENV_PREFIX = "eventsbot_"
 
 # We cannot access return values from a scheduled function
 # The solution is to use a global variable
-added_events = 0
+ADDED_EVENTS = 0
 
 logger = logging.getLogger()
 logger.setLevel(logging.WARN)
@@ -51,27 +53,28 @@ class ConfigMode(Enum):
     CLI = auto()
 
 
-def get_this_week_events(url: str) -> list[ics.Event]:
+def get_this_week_events(url: str, default_location: str) -> list[Event]:
     """Get events happening this week from an ICS calendar."""
-    calendar = ics.Calendar(requests.get(url).text)
-    now = arrow.utcnow()
+    ical_string = requests.get(url).text
+    calendar = icalendar.Calendar.from_ical(ical_string)
+
+    now = pytz.utc.localize(datetime.utcnow())
+    start_date = now - timedelta(days=now.weekday())
+    end_date = start_date + timedelta(days=6)
+
     events = []
-    for event in calendar.timeline.start_after(now):
-        if event.begin.is_between(*now.span("week")):
-            events.append(event)
+    for event in recurring_ical_events.of(calendar).between(start_date, end_date):
+        location = event.decoded("location") if event.decoded("location") else default_location
+        events.append(
+            Event(
+                event.get("summary"),
+                event.get("description"),
+                event.decoded("dtstart").astimezone(pytz.utc).isoformat(),
+                event.decoded("dtend").astimezone(pytz.utc).isoformat(),
+                {"location": location},
+            )
+        )
     return events
-
-
-def ics_to_discord(event: ics.Event, default_location: str) -> Event:
-    """Convert an ICS event to Discord event."""
-    location = event.location if event.location else default_location
-    return Event(
-        event.name,
-        event.description,
-        event.begin.isoformat(),
-        event.end.isoformat(),
-        {"location": location},
-    )
 
 
 def check_config(config: dict, mode: ConfigMode) -> None:
@@ -156,11 +159,11 @@ def send_message(guild: DiscordGuild, message: dict, event_id: str) -> None:
 def update_events(config: dict, guild: DiscordGuild) -> None:
     """Check upcoming events and create them on Discord if needed."""
 
-    global added_events
-    added_events = 0
+    global ADDED_EVENTS  # pylint: disable=global-statement
+    ADDED_EVENTS = 0
     try:
-        events = get_this_week_events(config["calendar_url"])
-    except (requests.exceptions.RequestException, tatsu.exceptions.ParseException) as exc:
+        events = get_this_week_events(config["calendar_url"], config["default_location"])
+    except requests.exceptions.RequestException as exc:
         logger.error("Unable to load calendar %s\n%s", config["calendar_url"], exc)
         return
 
@@ -170,16 +173,15 @@ def update_events(config: dict, guild: DiscordGuild) -> None:
 
     logger.info("Upcoming events this week:")
     for event in events:
-        logger.info("\t- %s (%s - %s)", event.name, event.begin.isoformat(), event.end.isoformat())
+        logger.info("\t- %s (%s - %s)", event.name, event.start_time, event.end_time)
 
     for event in events:
-        new_event = ics_to_discord(event, config["default_location"])
-        if new_event in guild.events:
-            logger.debug("Event %s (%s) already exist, skipping.", event.name, event.begin.isoformat())
+        if event in guild.events:
+            logger.debug("Event %s (%s) already exist, skipping.", event.name, event.start_time)
             continue
-        logger.info("Creating new event %s (%s) on Discord.", event.name, event.begin.isoformat())
-        event_id = guild.create_event(new_event)
-        added_events += 1
+        logger.info("Creating new event %s (%s) on Discord.", event.name, event.start_time)
+        event_id = guild.create_event(event)
+        ADDED_EVENTS += 1
 
         message = config["discord"].get("message", {})
         if message:
@@ -197,7 +199,7 @@ def run(config: dict) -> int:
 
     if config["once"]:
         schedule.clear()
-        return added_events
+        return ADDED_EVENTS
 
     for sig in (signal.SIGINT, signal.SIGTERM):
         signal.signal(sig, signal_handler)
@@ -205,7 +207,7 @@ def run(config: dict) -> int:
         schedule.run_pending()
         time.sleep(1)
 
-    return added_events
+    return ADDED_EVENTS
 
 
 def get_from_env(variable: str, default: None | str = None) -> None | bool | str:
@@ -214,11 +216,12 @@ def get_from_env(variable: str, default: None | str = None) -> None | bool | str
     if variable not in os.environ:
         return default
 
+    value = None
     if variable in os.environ:
         value = os.environ.get(variable)
         if value is not None and re.search(r"^[Y|y]es|YES|[T|t]rue|TRUE|[O|o]n|ON|1$", value):
             return True
-        elif value is not None and re.search(r"^[N|n]o|NO|[F|f]alse|FALSE|[O|o]ff|OFF|0$", value):
+        if value is not None and re.search(r"^[N|n]o|NO|[F|f]alse|FALSE|[O|o]ff|OFF|0$", value):
             return False
     return value
 
@@ -226,7 +229,7 @@ def get_from_env(variable: str, default: None | str = None) -> None | bool | str
 def setup_from_env() -> dict:
     """Setup the bot using environment variables."""
 
-    config: dict = {"discord": {"message": {}}}
+    config: dict[str, Any] = {"discord": {"message": {}}}
     root_variables = [
         ("default_location", DEFAULT_EVENT_LOCATION),
         ("calendar_url", None),
