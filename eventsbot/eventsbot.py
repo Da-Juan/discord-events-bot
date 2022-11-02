@@ -7,6 +7,7 @@ import signal
 import sys
 import time
 from enum import Enum, auto
+from typing import Any
 
 import arrow
 
@@ -214,6 +215,7 @@ def get_from_env(variable: str, default: None | str = None) -> None | bool | str
     if variable not in os.environ:
         return default
 
+    value = None
     if variable in os.environ:
         value = os.environ.get(variable)
         if value is not None and re.search(r"^[Y|y]es|YES|[T|t]rue|TRUE|[O|o]n|ON|1$", value):
@@ -226,7 +228,7 @@ def get_from_env(variable: str, default: None | str = None) -> None | bool | str
 def setup_from_env() -> dict:
     """Setup the bot using environment variables."""
 
-    config: dict = {"discord": {"message": {}}}
+    config: dict[str, Any] = {"discord": {"message": {}}}
     root_variables = [
         ("default_location", DEFAULT_EVENT_LOCATION),
         ("calendar_url", None),
