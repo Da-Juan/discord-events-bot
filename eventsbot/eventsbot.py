@@ -36,7 +36,7 @@ ENV_PREFIX = "eventsbot_"
 
 # We cannot access return values from a scheduled function
 # The solution is to use a global variable
-added_events = 0
+ADDED_EVENTS = 0
 
 logger = logging.getLogger()
 logger.setLevel(logging.WARN)
@@ -159,8 +159,8 @@ def send_message(guild: DiscordGuild, message: dict, event_id: str) -> None:
 def update_events(config: dict, guild: DiscordGuild) -> None:
     """Check upcoming events and create them on Discord if needed."""
 
-    global added_events
-    added_events = 0
+    global ADDED_EVENTS  # pylint: disable=global-statement
+    ADDED_EVENTS = 0
     try:
         events = get_this_week_events(config["calendar_url"], config["default_location"])
     except requests.exceptions.RequestException as exc:
@@ -181,7 +181,7 @@ def update_events(config: dict, guild: DiscordGuild) -> None:
             continue
         logger.info("Creating new event %s (%s) on Discord.", event.name, event.start_time)
         event_id = guild.create_event(event)
-        added_events += 1
+        ADDED_EVENTS += 1
 
         message = config["discord"].get("message", {})
         if message:
@@ -199,7 +199,7 @@ def run(config: dict) -> int:
 
     if config["once"]:
         schedule.clear()
-        return added_events
+        return ADDED_EVENTS
 
     for sig in (signal.SIGINT, signal.SIGTERM):
         signal.signal(sig, signal_handler)
@@ -207,7 +207,7 @@ def run(config: dict) -> int:
         schedule.run_pending()
         time.sleep(1)
 
-    return added_events
+    return ADDED_EVENTS
 
 
 def get_from_env(variable: str, default: None | str = None) -> None | bool | str:
@@ -221,7 +221,7 @@ def get_from_env(variable: str, default: None | str = None) -> None | bool | str
         value = os.environ.get(variable)
         if value is not None and re.search(r"^[Y|y]es|YES|[T|t]rue|TRUE|[O|o]n|ON|1$", value):
             return True
-        elif value is not None and re.search(r"^[N|n]o|NO|[F|f]alse|FALSE|[O|o]ff|OFF|0$", value):
+        if value is not None and re.search(r"^[N|n]o|NO|[F|f]alse|FALSE|[O|o]ff|OFF|0$", value):
             return False
     return value
 
