@@ -4,10 +4,12 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-ics = "*"
 requests = "*"
 pyyaml = "*"
 schedule = "*"
+icalendar = "*"
+recurring-ical-events = "*"
+pytz = "*"
 
 [dev-packages]
 flake8 = "*"
