@@ -73,8 +73,7 @@ def _api_request(
             return _api_request(url, method, headers, data, expected_status, error_ok)
 
     if not error_ok:
-        response.raise_for_status()
-        assert response.status_code == expected_status
+        logger.error("HTTPError %s: %s", (response.status_code, response.reason))
 
     try:
         return response.status_code, response.json()
