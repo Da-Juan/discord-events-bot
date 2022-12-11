@@ -114,32 +114,6 @@ def check_config(config: dict, mode: ConfigMode) -> None:
     check_history(config["history_path"])
 
 
-def load_config(config_path: pathlib.Path) -> dict:
-    """Load and validate the configuration file."""
-
-    with open(config_path, "r", encoding="utf-8") as config_file:
-        config = yaml.safe_load(config_file)
-
-    mandatory_options = {"root": ["calendar_url"], "discord": ["token", "bot_url", "server_id"]}
-    for key, options in mandatory_options.items():
-        if key != "root" and key not in config:
-            raise KeyError(f"Missing '{key}' in the configuration file")
-        for option in options:
-            search_dict = config
-            if key != "root":
-                search_dict = config[key]
-            if option not in search_dict:
-                raise KeyError(
-                    f"""Missing '{option}' in {"'"+key+"' section of " if key != "root" else ""}"""
-                    f"""the configuration file"""
-                )
-    optional_values = {"default_location": DEFAULT_EVENT_LOCATION, "run_interval": DEFAULT_INTERVAL}
-    for key, value in optional_values.items():
-        if key not in config:
-            config[key] = value
-    return config
-
-
 def signal_handler(sig: int, _) -> None:
     """Handle signal for a clean exit."""
     logger.info("Recieved signal %s, exiting.", sig)
