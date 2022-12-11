@@ -48,7 +48,13 @@ The bot reads a calendar in iCal format, here are the steps to get the URL for a
 ## Usage
 
 Copy `example_config.yaml` as `config.yaml` and adapt it with your settings.  
-Run the bot with Docker:
+
+Only on the first run, create the Docker volume and set its permissions:
+```
+docker run --rm --user 0 --mount type=volume,source=eventsbot,target=/home/bot/.eventsbot --entrypoint /bin/chown nrouanet/eventsbot 1000:1000 /home/bot/.eventsbot
+```
+
+Then, run the bot with Docker:
 
 ```bash
 docker run -d --name eventsbot --mount type=bind,source=<absolute_path_to_config.yaml>,target=/config.yaml,readonly --mount type=volume,source=eventsbot,target=/home/bot/.eventsbot nrouanet/eventsbot
