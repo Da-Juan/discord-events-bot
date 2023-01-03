@@ -185,6 +185,11 @@ def update_events(config: dict, guild: DiscordGuild) -> None:
             continue
         logger.info("Creating new event %s (%s) on Discord.", event.name, event.start_time)
         event_id = guild.create_event(event)
+
+        if not event_id:
+            logger.error("Unable to create event on Discord, skipping.")
+            continue
+
         ADDED_EVENTS += 1
 
         message = config["discord"].get("message", {})

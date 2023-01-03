@@ -181,7 +181,7 @@ class DiscordGuild:
 
         _, scheduled_event = _api_request(url, "POST", self.headers, data)
         self._refresh_events()
-        return scheduled_event["id"]
+        return scheduled_event.get("id", "")
 
     def create_message(self, channel: str, content: str, mention_everyone: None | bool = False) -> tuple[str, str]:
         """Create a message in a guild channel."""
