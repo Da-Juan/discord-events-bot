@@ -28,6 +28,7 @@ from .constants import (
     DEFAULT_INTERVAL,
     DEFAULT_MESSAGE,
     DEFAULT_MESSAGE_HISTORY,
+    DEFAULT_TIMEOUT,
     DISCORD_SHORT_URL,
     ENV_PREFIX,
 )
@@ -56,7 +57,7 @@ class ConfigMode(Enum):
 
 def get_this_week_events(url: str, default_location: str) -> list[Event]:
     """Get events happening this week from an ICS calendar."""
-    ical_string = requests.get(url).text
+    ical_string = requests.get(url, timeout=DEFAULT_TIMEOUT).text
     calendar = icalendar.Calendar.from_ical(ical_string)
 
     now = pytz.utc.localize(datetime.utcnow())

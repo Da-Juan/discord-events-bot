@@ -8,6 +8,8 @@ from typing import Any
 
 import requests
 
+from .constants import DEFAULT_TIMEOUT
+
 DISCORD_API_URL = "https://discord.com/api/v10"
 
 logger = logging.getLogger(__name__)
@@ -59,9 +61,10 @@ def _api_request(
     data: None | str = None,
     expected_status: None | int = 200,
     error_ok: bool = False,
+    timeout: int = DEFAULT_TIMEOUT,
 ) -> tuple[int, dict]:
     """Manage API requests."""
-    response = requests.request(method, url, headers=headers, data=data)
+    response = requests.request(method, url, headers=headers, data=data, timeout=timeout)
     logger.debug("API response code: %s", response.status_code)
     logger.debug("API response content: %s", response.content)
 
@@ -70,7 +73,7 @@ def _api_request(
             seconds = float(response.headers.get("X-RateLimit-Reset-After", 0))
             logger.info("Rate limiting hit, waiting for %s seconds", seconds)
             sleep(seconds)
-            return _api_request(url, method, headers, data, expected_status, error_ok)
+            return _api_request(url, method, headers, data, expected_status, error_ok, timeout=timeout)
 
     if not error_ok and response.status_code != expected_status:
         logger.error("HTTPError %s: %s", response.status_code, response.reason)
