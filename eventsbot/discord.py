@@ -137,7 +137,7 @@ class DiscordGuild:
         """Returns the list of guild events."""
 
         if datetime.datetime.now().timestamp() - self._events_last_pull > self._events_list_ttl:
-            logger.info("TTL has expired, refreshing events list")
+            logger.debug("TTL has expired, refreshing events list.")
             self._refresh_events()
 
         return self._events
@@ -147,7 +147,7 @@ class DiscordGuild:
         """Returns the list of guild channels."""
 
         if datetime.datetime.now().timestamp() - self._channels_last_pull > self._channels_list_ttl:
-            logger.info("TTL has expired, refreshing channels list")
+            logger.debug("TTL has expired, refreshing channels list.")
             self._refresh_channels()
 
         return self._channels
