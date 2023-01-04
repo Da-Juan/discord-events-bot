@@ -57,7 +57,7 @@ docker run --rm --user 0 --mount type=volume,source=eventsbot,target=/home/bot/.
 Then, run the bot with Docker:
 
 ```bash
-docker run -d --name eventsbot --mount type=bind,source=<absolute_path_to_config.yaml>,target=/config.yaml,readonly --mount type=volume,source=eventsbot,target=/home/bot/.eventsbot nrouanet/eventsbot
+docker run -d --name eventsbot --restart always --mount type=bind,source=<absolute_path_to_config.yaml>,target=/config.yaml,readonly --mount type=volume,source=eventsbot,target=/home/bot/.eventsbot nrouanet/eventsbot
 ```
 
 ## References
