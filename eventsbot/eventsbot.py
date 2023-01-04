@@ -36,10 +36,6 @@ from .discord import DiscordGuild, Event
 from .history import check_history, load_history, save_history
 from .utils import duration_to_seconds
 
-# We cannot access return values from a scheduled function
-# The solution is to use a global variable
-ADDED_EVENTS = 0
-
 logger = logging.getLogger()
 logger.setLevel(logging.WARN)
 handler = logging.StreamHandler()
@@ -158,8 +154,6 @@ def cleanup_old_messages(guild: DiscordGuild, history: list[dict[str, str]]) -> 
 def update_events(config: dict, guild: DiscordGuild) -> None:
     """Check upcoming events and create them on Discord if needed."""
 
-    global ADDED_EVENTS  # pylint: disable=global-statement
-    ADDED_EVENTS = 0
     try:
         events = get_this_week_events(config["calendar_url"], config["default_location"])
     except requests.exceptions.RequestException as exc:
@@ -180,6 +174,9 @@ def update_events(config: dict, guild: DiscordGuild) -> None:
 
     sent_messages = []
 
+    added_events = 0
+    message_config = config["discord"].get("message", {})
+
     for event in events:
         if event in guild.events:
             logger.debug("Event %s (%s) already exist, skipping.", event.name, event.start_time)
@@ -191,12 +188,18 @@ def update_events(config: dict, guild: DiscordGuild) -> None:
             logger.error("Unable to create event on Discord, skipping.")
             continue
 
-        ADDED_EVENTS += 1
+        added_events += 1
 
-        message = config["discord"].get("message", {})
-        if message:
-            message_id, channel_id = send_message(guild, message, event_id)
+        if message_config:
+            message_id, channel_id = send_message(guild, message_config, event_id)
             sent_messages.append({"event_id": event_id, "message_id": message_id, "channel_id": channel_id})
+
+    if added_events == 0:
+        msg = "All upcoming events already exist."
+    else:
+        msg = f"{added_events} new event{'s' if added_events > 1 else ''} added."
+
+    logger.info(msg)
 
     history += sent_messages
 
@@ -204,7 +207,7 @@ def update_events(config: dict, guild: DiscordGuild) -> None:
     save_history(config["history_path"], history)
 
 
-def run(config: dict) -> int:
+def run(config: dict) -> None:
     """Run the main loop."""
 
     guild = DiscordGuild(config["discord"]["token"], config["discord"]["bot_url"], config["discord"]["server_id"])
@@ -215,15 +218,13 @@ def run(config: dict) -> int:
 
     if config["once"]:
         schedule.clear()
-        return ADDED_EVENTS
+        return
 
     for sig in (signal.SIGINT, signal.SIGTERM):
         signal.signal(sig, signal_handler)
     while True:
         schedule.run_pending()
         time.sleep(1)
-
-    return ADDED_EVENTS
 
 
 def get_from_env(variable: str, default: None | str = None) -> None | bool | str:
@@ -311,12 +312,8 @@ def cli() -> None:
     config = setup_from_cli()
     if not config:
         sys.exit(1)
-    count = run(config)
-    if count == 0:
-        msg = "All upcoming events already exist."
-    else:
-        msg = f"{count} new event{'s' if count > 1 else ''} added."
-    logger.info(msg)
+
+    run(config)
 
 
 if __name__ == "__main__":
