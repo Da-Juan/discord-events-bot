@@ -53,6 +53,7 @@ class ConfigMode(Enum):
 
 def get_this_week_events(url: str, default_location: str) -> list[Event]:
     """Get events happening this week from an ICS calendar."""
+
     ical_string = requests.get(url, timeout=DEFAULT_TIMEOUT).text
     calendar = icalendar.Calendar.from_ical(ical_string)
 
@@ -113,6 +114,7 @@ def check_config(config: dict, mode: ConfigMode) -> None:
 
 def signal_handler(sig: int, _) -> None:
     """Handle signal for a clean exit."""
+
     logger.info("Recieved signal %s, exiting.", sig)
     schedule.clear()
     sys.exit()
@@ -309,7 +311,9 @@ def setup_from_cli() -> dict:
 
 def cli() -> None:
     """Run the bot from CLI."""
+
     config = setup_from_cli()
+
     if not config:
         sys.exit(1)
 
