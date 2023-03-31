@@ -8,6 +8,8 @@ from typing import Any
 
 import requests
 
+from .constants import DEFAULT_TIMEOUT
+
 DISCORD_API_URL = "https://discord.com/api/v10"
 
 logger = logging.getLogger(__name__)
@@ -25,6 +27,7 @@ class Channel:
 class Event:
     """Discord event."""
 
+    id: None | str  # pylint: disable=invalid-name
     name: str
     description: str
     start_time: str
@@ -50,6 +53,7 @@ class DiscordGuildError(Exception):
     """Base exception class."""
 
 
+# pylint: disable=too-many-arguments
 def _api_request(
     url: str,
     method: str,
@@ -57,9 +61,10 @@ def _api_request(
     data: None | str = None,
     expected_status: None | int = 200,
     error_ok: bool = False,
+    timeout: int = DEFAULT_TIMEOUT,
 ) -> tuple[int, dict]:
     """Manage API requests."""
-    response = requests.request(method, url, headers=headers, data=data)
+    response = requests.request(method, url, headers=headers, data=data, timeout=timeout)
     logger.debug("API response code: %s", response.status_code)
     logger.debug("API response content: %s", response.content)
 
@@ -68,11 +73,10 @@ def _api_request(
             seconds = float(response.headers.get("X-RateLimit-Reset-After", 0))
             logger.info("Rate limiting hit, waiting for %s seconds", seconds)
             sleep(seconds)
-            return _api_request(url, method, headers, data, expected_status, error_ok)
+            return _api_request(url, method, headers, data, expected_status, error_ok, timeout=timeout)
 
-    if not error_ok:
-        response.raise_for_status()
-        assert response.status_code == expected_status
+    if not error_ok and response.status_code != expected_status:
+        logger.error("HTTPError %s: %s", response.status_code, response.reason)
 
     try:
         return response.status_code, response.json()
@@ -106,6 +110,7 @@ class DiscordGuild:
         for event in response:
             events.append(
                 Event(
+                    event["id"],
                     event["name"],
                     description=event["description"] if event["description"] is not None else "",
                     start_time=event["scheduled_start_time"],
@@ -132,7 +137,7 @@ class DiscordGuild:
         """Returns the list of guild events."""
 
         if datetime.datetime.now().timestamp() - self._events_last_pull > self._events_list_ttl:
-            logger.info("TTL has expired, refreshing events list")
+            logger.debug("TTL has expired, refreshing events list.")
             self._refresh_events()
 
         return self._events
@@ -142,10 +147,15 @@ class DiscordGuild:
         """Returns the list of guild channels."""
 
         if datetime.datetime.now().timestamp() - self._channels_last_pull > self._channels_list_ttl:
-            logger.info("TTL has expired, refreshing channels list")
+            logger.debug("TTL has expired, refreshing channels list.")
             self._refresh_channels()
 
         return self._channels
+
+    def event_id_exists(self, event_id) -> bool:
+        """Check if a given event ID exist."""
+
+        return event_id in [event.id for event in self.events]
 
     def get_channel_id(self, name) -> str:
         """Get a channel ID from its name."""
@@ -174,9 +184,9 @@ class DiscordGuild:
 
         _, scheduled_event = _api_request(url, "POST", self.headers, data)
         self._refresh_events()
-        return scheduled_event["id"]
+        return scheduled_event.get("id", "")
 
-    def create_message(self, channel: str, content: str, mention_everyone: None | bool = False) -> None:
+    def create_message(self, channel: str, content: str, mention_everyone: None | bool = False) -> tuple[str, str]:
         """Create a message in a guild channel."""
 
         url = f"{self.base_api_url}/channels/{self.get_channel_id(channel)}/messages"
@@ -186,7 +196,8 @@ class DiscordGuild:
             message_data["allowed_mentions"] = {"parse": ["everyone"]}
         data = json.dumps(message_data)
 
-        _api_request(url, "POST", self.headers, data)
+        _, message = _api_request(url, "POST", self.headers, data)
+        return message["id"], message["channel_id"]
 
     def create_invite(self, channel: str, max_age: None | int = 0) -> str:
         """Create a guild invite code."""
@@ -196,3 +207,13 @@ class DiscordGuild:
 
         _, invite = _api_request(url, "POST", self.headers, data)
         return invite["code"]
+
+    def delete_message(self, channel_id: str, message_id: str) -> None:
+        """Delete a message in a guild channel."""
+
+        url = f"{self.base_api_url}/channels/{channel_id}/messages/{message_id}"
+        status_code, _ = _api_request(url, "DELETE", self.headers, expected_status=204, error_ok=True)
+        if status_code == 204:
+            logger.info("Message %s deleted", message_id)
+        elif status_code == 404:
+            logger.warning("Channel or message not found")

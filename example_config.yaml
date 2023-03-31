@@ -1,10 +1,12 @@
 # Default event location for events in calendar that does not have a location set
-default_location: Sanata Claus Village 96930 Rovaniemi, Finland
+default_location: Santa Claus Village 96930 Rovaniemi, Finland
 # ICS calendar URL
 calendar_url: https://example.org/calendar.ics
 # The inverval before the bot id run again (defaults to 24h)
 # Valid time units are "s", "m", "h"
 run_interval: 24h
+# The path to save the message history for automatic message cleanup
+history_path: ~/.eventsbot/history
 
 discord:
   # Discord bot token

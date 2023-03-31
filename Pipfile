@@ -21,6 +21,7 @@ pylint = "*"
 mypy = "*"
 types-requests = "*"
 types-pyyaml = "*"
+types-pytz = "*"
 
 [requires]
 python_version = "3.10"
