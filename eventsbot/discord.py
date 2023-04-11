@@ -27,7 +27,7 @@ class Channel:
 class Event:
     """Discord event."""
 
-    id: None | str  # pylint: disable=invalid-name
+    event_id: None | str
     name: str
     description: str
     start_time: str
@@ -155,7 +155,7 @@ class DiscordGuild:
     def event_id_exists(self, event_id) -> bool:
         """Check if a given event ID exist."""
 
-        return event_id in [event.id for event in self.events]
+        return event_id in [event.event_id for event in self.events]
 
     def get_channel_id(self, name) -> str:
         """Get a channel ID from its name."""

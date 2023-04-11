@@ -66,7 +66,7 @@ def get_this_week_events(url: str, default_location: str) -> list[Event]:
         location = event.decoded("location") if event.decoded("location") else default_location
         events.append(
             Event(
-                id=None,
+                event_id=None,
                 name=event.get("summary"),
                 description=event.get("description"),
                 start_time=event.decoded("dtstart").astimezone(pytz.utc).isoformat(),
