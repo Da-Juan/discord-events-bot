@@ -69,8 +69,7 @@ def _api_request(
     logger.debug("API response code: %s", response.status_code)
     logger.debug("API response content: %s", response.content)
 
-    if response.status_code == 429:
-        if "X-RateLimit-Reset-After" in response.headers:
+    if response.status_code == 429 and "X-RateLimit-Reset-After" in response.headers:
             seconds = float(response.headers.get("X-RateLimit-Reset-After", 0))
             logger.info("Rate limiting hit, waiting for %s seconds", seconds)
             sleep(seconds)
