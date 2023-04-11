@@ -56,6 +56,7 @@ class DiscordGuildError(Exception):
 # pylint: disable=too-many-arguments
 def _api_request(
     url: str,
+    *,
     method: str,
     headers: None | dict = None,
     data: None | str = None,
@@ -73,7 +74,7 @@ def _api_request(
             seconds = float(response.headers.get("X-RateLimit-Reset-After", 0))
             logger.info("Rate limiting hit, waiting for %s seconds", seconds)
             sleep(seconds)
-            return _api_request(url, method, headers, data, expected_status, error_ok, timeout=timeout)
+            return _api_request(url, method=method, headers=headers, data=data, expected_status=expected_status, error_ok=error_ok, timeout=timeout)
 
     if not error_ok and response.status_code != expected_status:
         logger.error("HTTPError %s: %s", response.status_code, response.reason)
@@ -106,7 +107,7 @@ class DiscordGuild:
         """Refresh the list of guild events."""
         url = f"{self.base_api_url}/guilds/{self.guild_id}/scheduled-events"
         events = []
-        _, response = _api_request(url, "GET", self.headers)
+        _, response = _api_request(url, method="GET", headers=self.headers)
         for event in response:
             events.append(
                 Event(
@@ -126,7 +127,7 @@ class DiscordGuild:
 
         url = f"{self.base_api_url}/guilds/{self.guild_id}/channels"
         channels = []
-        _, response = _api_request(url, "GET", self.headers)
+        _, response = _api_request(url, method="GET", headers=self.headers)
         for channel in response:
             channels.append(Channel(channel["name"], channel["id"]))
         self._channels = channels
@@ -182,11 +183,11 @@ class DiscordGuild:
             }
         )
 
-        _, scheduled_event = _api_request(url, "POST", self.headers, data)
+        _, scheduled_event = _api_request(url, method="POST", headers=self.headers, data=data)
         self._refresh_events()
         return scheduled_event.get("id", "")
 
-    def create_message(self: "DiscordGuild", channel: str, content: str, mention_everyone: None | bool = False) -> tuple[str, str]:
+    def create_message(self: "DiscordGuild", channel: str, content: str, *, mention_everyone: None | bool = False) -> tuple[str, str]:
         """Create a message in a guild channel."""
 
         url = f"{self.base_api_url}/channels/{self.get_channel_id(channel)}/messages"
@@ -196,7 +197,7 @@ class DiscordGuild:
             message_data["allowed_mentions"] = {"parse": ["everyone"]}
         data = json.dumps(message_data)
 
-        _, message = _api_request(url, "POST", self.headers, data)
+        _, message = _api_request(url, method="POST", headers=self.headers, data=data)
         return message["id"], message["channel_id"]
 
     def create_invite(self: "DiscordGuild", channel: str, max_age: None | int = 0) -> str:
@@ -205,14 +206,14 @@ class DiscordGuild:
         url = f"{self.base_api_url}/channels/{self.get_channel_id(channel)}/invites"
         data = json.dumps({"max_age": max_age})
 
-        _, invite = _api_request(url, "POST", self.headers, data)
+        _, invite = _api_request(url, method="POST", headers=self.headers, data=data)
         return invite["code"]
 
     def delete_message(self: "DiscordGuild", channel_id: str, message_id: str) -> None:
         """Delete a message in a guild channel."""
 
         url = f"{self.base_api_url}/channels/{channel_id}/messages/{message_id}"
-        status_code, _ = _api_request(url, "DELETE", self.headers, expected_status=204, error_ok=True)
+        status_code, _ = _api_request(url, method="DELETE", headers=self.headers, expected_status=204, error_ok=True)
         if status_code == 204:
             logger.info("Message %s deleted", message_id)
         elif status_code == 404:

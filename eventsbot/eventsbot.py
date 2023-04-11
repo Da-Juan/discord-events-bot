@@ -136,7 +136,7 @@ def send_message(guild: DiscordGuild, message: dict, event_id: str) -> tuple[str
         content += f" {DISCORD_SHORT_URL}/{guild.create_invite(channel)}?event={event_id}"
 
     logger.info("Sending message on channel %s.", channel)
-    return guild.create_message(channel, content, message.get("mention_everyone", False))
+    return guild.create_message(channel, content, mention_everyone=message.get("mention_everyone", False))
 
 
 def cleanup_old_messages(guild: DiscordGuild, history: list[dict[str, str]]) -> list[dict[str, str]]:
