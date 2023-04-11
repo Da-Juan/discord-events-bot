@@ -73,7 +73,15 @@ def _api_request(
             seconds = float(response.headers.get("X-RateLimit-Reset-After", 0))
             logger.info("Rate limiting hit, waiting for %s seconds", seconds)
             sleep(seconds)
-            return _api_request(url, method=method, headers=headers, data=data, expected_status=expected_status, error_ok=error_ok, timeout=timeout)
+            return _api_request(
+                url,
+                method=method,
+                headers=headers,
+                data=data,
+                expected_status=expected_status,
+                error_ok=error_ok,
+                timeout=timeout,
+            )
 
     if not error_ok and response.status_code != expected_status:
         logger.error("HTTPError %s: %s", response.status_code, response.reason)
@@ -186,7 +194,9 @@ class DiscordGuild:
         self._refresh_events()
         return scheduled_event.get("id", "")
 
-    def create_message(self: "DiscordGuild", channel: str, content: str, *, mention_everyone: None | bool = False) -> tuple[str, str]:
+    def create_message(
+        self: "DiscordGuild", channel: str, content: str, *, mention_everyone: None | bool = False
+    ) -> tuple[str, str]:
         """Create a message in a guild channel."""
 
         url = f"{self.base_api_url}/channels/{self.get_channel_id(channel)}/messages"
