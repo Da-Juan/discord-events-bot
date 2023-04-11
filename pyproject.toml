@@ -27,3 +27,7 @@ timeout = 10
 
 [tool.mypy]
 ignore_missing_imports = true
+
+[tool.ruff]
+line-length = 120
+select = ["ALL"]
