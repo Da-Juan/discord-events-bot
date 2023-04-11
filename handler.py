@@ -4,7 +4,7 @@ import json
 from eventsbot import run, setup_from_env
 
 
-def handle(*_) -> dict:
+def handle(*_: Any) -> dict:
     """Handle serverless run."""
 
     config = setup_from_env()

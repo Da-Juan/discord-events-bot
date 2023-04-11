@@ -8,6 +8,7 @@ import sys
 import time
 from datetime import datetime, timedelta
 from enum import Enum, auto
+from types import FrameType
 from typing import Any
 
 import icalendar
@@ -112,7 +113,7 @@ def check_config(config: dict, mode: ConfigMode) -> None:
     check_history(config["history_path"])
 
 
-def signal_handler(sig: int, _) -> None:
+def signal_handler(sig: int, _: FrameType) -> None:
     """Handle signal for a clean exit."""
 
     logger.info("Recieved signal %s, exiting.", sig)
