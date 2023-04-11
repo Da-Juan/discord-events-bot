@@ -70,18 +70,18 @@ def _api_request(
     logger.debug("API response content: %s", response.content)
 
     if response.status_code == 429 and "X-RateLimit-Reset-After" in response.headers:
-            seconds = float(response.headers.get("X-RateLimit-Reset-After", 0))
-            logger.info("Rate limiting hit, waiting for %s seconds", seconds)
-            sleep(seconds)
-            return _api_request(
-                url,
-                method=method,
-                headers=headers,
-                data=data,
-                expected_status=expected_status,
-                error_ok=error_ok,
-                timeout=timeout,
-            )
+        seconds = float(response.headers.get("X-RateLimit-Reset-After", 0))
+        logger.info("Rate limiting hit, waiting for %s seconds", seconds)
+        sleep(seconds)
+        return _api_request(
+            url,
+            method=method,
+            headers=headers,
+            data=data,
+            expected_status=expected_status,
+            error_ok=error_ok,
+            timeout=timeout,
+        )
 
     if not error_ok and response.status_code != expected_status:
         logger.error("HTTPError %s: %s", response.status_code, response.reason)
@@ -124,7 +124,7 @@ class DiscordGuild:
                     start_time=event["scheduled_start_time"],
                     end_time=event["scheduled_end_time"],
                     metadata=event["entity_metadata"],
-                )
+                ),
             )
         self._events = events
         self._events_last_pull = datetime.datetime.now().timestamp()
@@ -187,7 +187,7 @@ class DiscordGuild:
                 "description": event.description,
                 "entity_metadata": event.metadata,
                 "entity_type": 3,
-            }
+            },
         )
 
         _, scheduled_event = _api_request(url, method="POST", headers=self.headers, data=data)
@@ -195,7 +195,11 @@ class DiscordGuild:
         return scheduled_event.get("id", "")
 
     def create_message(
-        self: "DiscordGuild", channel: str, content: str, *, mention_everyone: None | bool = False
+        self: "DiscordGuild",
+        channel: str,
+        content: str,
+        *,
+        mention_everyone: None | bool = False,
     ) -> tuple[str, str]:
         """Create a message in a guild channel."""
 

@@ -73,7 +73,7 @@ def get_this_week_events(url: str, default_location: str) -> list[Event]:
                 start_time=event.decoded("dtstart").astimezone(pytz.utc).isoformat(),
                 end_time=event.decoded("dtend").astimezone(pytz.utc).isoformat(),
                 metadata={"location": location},
-            )
+            ),
         )
     return events
 

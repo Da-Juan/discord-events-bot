@@ -28,7 +28,7 @@ def load_history(history_path: str) -> list[dict[str, str]]:
             history = json.load(history_file)
     except json.decoder.JSONDecodeError:
         logger.warning(
-            "Corrupted history file, resetting it. You might have to cleanp manually messages posted by the bot"
+            "Corrupted history file, resetting it. You might have to cleanp manually messages posted by the bot",
         )
 
     return history
