@@ -35,7 +35,7 @@ class Event:
     metadata: dict[str, str]
     privacy_level: int = 2
 
-    def __eq__(self, other) -> bool:
+    def __eq__(self: "Event", other: "Event") -> bool:
         if not isinstance(other, Event):
             # don't attempt to compare against unrelated types
             return NotImplemented
@@ -90,7 +90,7 @@ class DiscordGuild:
     _channels_list_ttl = 3600
     _events_list_ttl = 3600
 
-    def __init__(self, token: str, bot_url: str, guild_id: str) -> None:
+    def __init__(self: "DiscordGuild", token: str, bot_url: str, guild_id: str) -> None:
         self.base_api_url = DISCORD_API_URL
         self.guild_id = guild_id
         self.headers = {
@@ -102,7 +102,7 @@ class DiscordGuild:
         self._refresh_events()
         self._refresh_channels()
 
-    def _refresh_events(self):
+    def _refresh_events(self: "DiscordGuild") -> None:
         """Refresh the list of guild events."""
         url = f"{self.base_api_url}/guilds/{self.guild_id}/scheduled-events"
         events = []
@@ -121,7 +121,7 @@ class DiscordGuild:
         self._events = events
         self._events_last_pull = datetime.datetime.now().timestamp()
 
-    def _refresh_channels(self) -> None:
+    def _refresh_channels(self: "DiscordGuild") -> None:
         """Refresh the list of guild channels."""
 
         url = f"{self.base_api_url}/guilds/{self.guild_id}/channels"
@@ -133,7 +133,7 @@ class DiscordGuild:
         self._channels_last_pull = datetime.datetime.now().timestamp()
 
     @property
-    def events(self) -> list[Event]:
+    def events(self: "DiscordGuild") -> list[Event]:
         """Returns the list of guild events."""
 
         if datetime.datetime.now().timestamp() - self._events_last_pull > self._events_list_ttl:
@@ -143,7 +143,7 @@ class DiscordGuild:
         return self._events
 
     @property
-    def channels(self) -> list[Channel]:
+    def channels(self: "DiscordGuild") -> list[Channel]:
         """Returns the list of guild channels."""
 
         if datetime.datetime.now().timestamp() - self._channels_last_pull > self._channels_list_ttl:
@@ -152,12 +152,12 @@ class DiscordGuild:
 
         return self._channels
 
-    def event_id_exists(self, event_id) -> bool:
+    def event_id_exists(self: "DiscordGuild", event_id: str) -> bool:
         """Check if a given event ID exist."""
 
         return event_id in [event.event_id for event in self.events]
 
-    def get_channel_id(self, name) -> str:
+    def get_channel_id(self: "DiscordGuild", name: str) -> str:
         """Get a channel ID from its name."""
 
         for channel in self.channels:
@@ -166,7 +166,7 @@ class DiscordGuild:
 
         raise DiscordGuildError(f"Channel '{name}' not found")
 
-    def create_event(self, event: Event) -> str:
+    def create_event(self: "DiscordGuild", event: Event) -> str:
         """Creates a guild external event."""
 
         url = f"{self.base_api_url}/guilds/{self.guild_id}/scheduled-events"
@@ -186,7 +186,7 @@ class DiscordGuild:
         self._refresh_events()
         return scheduled_event.get("id", "")
 
-    def create_message(self, channel: str, content: str, mention_everyone: None | bool = False) -> tuple[str, str]:
+    def create_message(self: "DiscordGuild", channel: str, content: str, mention_everyone: None | bool = False) -> tuple[str, str]:
         """Create a message in a guild channel."""
 
         url = f"{self.base_api_url}/channels/{self.get_channel_id(channel)}/messages"
@@ -199,7 +199,7 @@ class DiscordGuild:
         _, message = _api_request(url, "POST", self.headers, data)
         return message["id"], message["channel_id"]
 
-    def create_invite(self, channel: str, max_age: None | int = 0) -> str:
+    def create_invite(self: "DiscordGuild", channel: str, max_age: None | int = 0) -> str:
         """Create a guild invite code."""
 
         url = f"{self.base_api_url}/channels/{self.get_channel_id(channel)}/invites"
@@ -208,7 +208,7 @@ class DiscordGuild:
         _, invite = _api_request(url, "POST", self.headers, data)
         return invite["code"]
 
-    def delete_message(self, channel_id: str, message_id: str) -> None:
+    def delete_message(self: "DiscordGuild", channel_id: str, message_id: str) -> None:
         """Delete a message in a guild channel."""
 
         url = f"{self.base_api_url}/channels/{channel_id}/messages/{message_id}"
