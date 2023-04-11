@@ -127,7 +127,7 @@ class DiscordGuild:
                 ),
             )
         self._events = events
-        self._events_last_pull = datetime.datetime.now().timestamp()
+        self._events_last_pull = datetime.datetime.now(tz=datetime.timezone.utc).timestamp()
 
     def _refresh_channels(self: "DiscordGuild") -> None:
         """Refresh the list of guild channels."""
@@ -138,13 +138,13 @@ class DiscordGuild:
         for channel in response:
             channels.append(Channel(channel["name"], channel["id"]))
         self._channels = channels
-        self._channels_last_pull = datetime.datetime.now().timestamp()
+        self._channels_last_pull = datetime.datetime.now(tz=datetime.timezone.utc).timestamp()
 
     @property
     def events(self: "DiscordGuild") -> list[Event]:
         """Returns the list of guild events."""
 
-        if datetime.datetime.now().timestamp() - self._events_last_pull > self._events_list_ttl:
+        if datetime.datetime.now(tz=datetime.timezone.utc).timestamp() - self._events_last_pull > self._events_list_ttl:
             logger.debug("TTL has expired, refreshing events list.")
             self._refresh_events()
 
@@ -154,7 +154,10 @@ class DiscordGuild:
     def channels(self: "DiscordGuild") -> list[Channel]:
         """Returns the list of guild channels."""
 
-        if datetime.datetime.now().timestamp() - self._channels_last_pull > self._channels_list_ttl:
+        if (
+            datetime.datetime.now(tz=datetime.timezone.utc).timestamp() - self._channels_last_pull
+            > self._channels_list_ttl
+        ):
             logger.debug("TTL has expired, refreshing channels list.")
             self._refresh_channels()
 
