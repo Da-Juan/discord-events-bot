@@ -298,8 +298,8 @@ def setup_from_cli() -> dict:
         logger.debug("Starting in debug mode...")
 
     try:
-        with open(args.config, "r", encoding="utf-8") as config_file:
-            config = yaml.safe_load(config_file)
+        config_path = pathlib.Path(args.config)
+        config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
         check_config(config, ConfigMode.CLI)
     except (KeyError, OSError) as exc:
         logger.error("Unable to load configuration file %s: %s", args.config, exc.args[-1])

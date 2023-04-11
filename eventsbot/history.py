@@ -13,7 +13,7 @@ def check_history(history_path: str) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
 
     if not path.exists():
-        with open(path, "w", encoding="utf-8") as history_file:
+        with path.open("w", encoding="utf-8") as history_file:
             json.dump([], history_file)
 
 
@@ -24,7 +24,7 @@ def load_history(history_path: str) -> list[dict[str, str]]:
 
     path = pathlib.Path(history_path)
     try:
-        with open(path, "r", encoding="utf-8") as history_file:
+        with path.open("r", encoding="utf-8") as history_file:
             history = json.load(history_file)
     except json.decoder.JSONDecodeError:
         logger.warning(
@@ -37,5 +37,5 @@ def load_history(history_path: str) -> list[dict[str, str]]:
 def save_history(history_path: str, history: list[dict[str, str]]) -> None:
     """Write message history to disk."""
     path = pathlib.Path(history_path)
-    with open(path, "w", encoding="utf-8") as history_file:
+    with path.open("w", encoding="utf-8") as history_file:
         json.dump(history, history_file)
