@@ -1,3 +1,4 @@
+"""Package constants definitions."""
 import pathlib
 
 DEFAULT_CHANNEL = "general"

@@ -1,3 +1,4 @@
+"""Event management module."""
 import argparse
 import logging
 import os
@@ -49,7 +50,6 @@ class ConfigMode(Enum):
 
 def get_this_week_events(url: str, default_location: str) -> list[Event]:
     """Get events happening this week from an ICS calendar."""
-
     ical_string = requests.get(url, timeout=DEFAULT_TIMEOUT).text
     calendar = icalendar.Calendar.from_ical(ical_string)
 
@@ -75,7 +75,6 @@ def get_this_week_events(url: str, default_location: str) -> list[Event]:
 
 def check_config(config: dict, mode: ConfigMode) -> None:
     """Validate the configuration dict."""
-
     mandatory_options = {"root": ["calendar_url"], "discord": ["token", "bot_url", "server_id"]}
     for key, options in mandatory_options.items():
         if key != "root" and key not in config:
@@ -110,7 +109,6 @@ def check_config(config: dict, mode: ConfigMode) -> None:
 
 def signal_handler(sig: int, _: FrameType) -> None:
     """Handle signal for a clean exit."""
-
     logger.info("Recieved signal %s, exiting.", sig)
     schedule.clear()
     sys.exit()
@@ -118,7 +116,6 @@ def signal_handler(sig: int, _: FrameType) -> None:
 
 def send_message(guild: DiscordGuild, message: dict, event_id: str) -> tuple[str, str]:
     """Send a message to announce a new event."""
-
     channel = message.get("channel", DEFAULT_CHANNEL)
 
     content = ""
@@ -136,7 +133,6 @@ def send_message(guild: DiscordGuild, message: dict, event_id: str) -> tuple[str
 
 def cleanup_old_messages(guild: DiscordGuild, history: list[dict[str, str]]) -> list[dict[str, str]]:
     """Delete obsolete events messages."""
-
     deleted_messages = []
     for message in history:
         if not guild.event_id_exists(message["event_id"]):
@@ -151,7 +147,6 @@ def cleanup_old_messages(guild: DiscordGuild, history: list[dict[str, str]]) -> 
 
 def update_events(config: dict, guild: DiscordGuild) -> None:
     """Check upcoming events and create them on Discord if needed."""
-
     try:
         events = get_this_week_events(config["calendar_url"], config["default_location"])
     except requests.exceptions.RequestException as exc:
@@ -207,7 +202,6 @@ def update_events(config: dict, guild: DiscordGuild) -> None:
 
 def run(config: dict) -> None:
     """Run the main loop."""
-
     guild = DiscordGuild(config["discord"]["token"], config["discord"]["bot_url"], config["discord"]["server_id"])
 
     schedule.every(duration_to_seconds(config["run_interval"])).seconds.do(update_events, config, guild)
@@ -227,7 +221,6 @@ def run(config: dict) -> None:
 
 def get_from_env(variable: str, default: None | str = None) -> None | bool | str:
     """Check if variable exist in env then return its value."""
-
     if variable not in os.environ:
         return default
 
@@ -242,8 +235,7 @@ def get_from_env(variable: str, default: None | str = None) -> None | bool | str
 
 
 def setup_from_env() -> dict:
-    """Setup the bot using environment variables."""
-
+    """Set up the bot using environment variables."""
     config: dict[str, Any] = {"discord": {"message": {}}}
     root_variables = [
         ("default_location", DEFAULT_EVENT_LOCATION),
@@ -275,8 +267,7 @@ def setup_from_env() -> dict:
 
 
 def setup_from_cli() -> dict:
-    """Setup the bot using CLI."""
-
+    """Set up the bot using CLI."""
     parser = argparse.ArgumentParser()
     parser.add_argument("config", type=pathlib.Path, help="Path to YAML configuration file")
     parser.add_argument("-d", "--debug", action="store_true", help="Run in debug mode")
@@ -307,7 +298,6 @@ def setup_from_cli() -> dict:
 
 def cli() -> None:
     """Run the bot from CLI."""
-
     config = setup_from_cli()
 
     if not config:

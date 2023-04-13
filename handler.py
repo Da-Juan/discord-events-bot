@@ -12,7 +12,6 @@ from eventsbot import run, setup_from_env
 
 def handle(event: "Event", context: "Context") -> "Response":  # noqa: ARG001
     """Handle serverless run."""
-
     config = setup_from_env()
     if not config:
         return {"body": json.dumps({"message": "Invalid configuration."}), "statusCode": 500}

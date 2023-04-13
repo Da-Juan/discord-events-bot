@@ -1,3 +1,4 @@
+"""History management module."""
 import json
 import logging
 import pathlib
@@ -7,7 +8,6 @@ logger = logging.getLogger(__name__)
 
 def check_history(history_path: str) -> None:
     """Check if history file exists or create it."""
-
     path = pathlib.Path(history_path)
     if not path.parent.exists():
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -19,7 +19,6 @@ def check_history(history_path: str) -> None:
 
 def load_history(history_path: str) -> list[dict[str, str]]:
     """Load the messages history."""
-
     history = []
 
     path = pathlib.Path(history_path)
