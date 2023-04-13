@@ -72,7 +72,7 @@ def _api_request(
     logger.debug("API response code: %s", response.status_code)
     logger.debug("API response content: %s", response.content)
 
-    if response.status_code == 429 and "X-RateLimit-Reset-After" in response.headers:
+    if response.status_code == requests.codes["too_many_requests"] and "X-RateLimit-Reset-After" in response.headers:
         seconds = float(response.headers.get("X-RateLimit-Reset-After", 0))
         logger.info("Rate limiting hit, waiting for %s seconds", seconds)
         sleep(seconds)
@@ -233,7 +233,7 @@ class DiscordGuild:
 
         url = f"{self.base_api_url}/channels/{channel_id}/messages/{message_id}"
         status_code, _ = _api_request(url, method="DELETE", headers=self.headers, expected_status=204, error_ok=True)
-        if status_code == 204:
+        if status_code == requests.codes["no_content"]:
             logger.info("Message %s deleted", message_id)
-        elif status_code == 404:
+        elif status_code == requests.codes["not_found"]:
             logger.warning("Channel or message not found")
