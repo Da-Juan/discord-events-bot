@@ -12,15 +12,10 @@ from types import FrameType
 from typing import Any
 
 import icalendar
-
 import pytz
-
 import recurring_ical_events
-
 import requests
-
 import schedule
-
 import yaml
 
 from .constants import (
