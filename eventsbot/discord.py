@@ -49,8 +49,11 @@ class Event:
         )
 
 
-class DiscordGuildError(Exception):
-    """Base exception class."""
+class DiscordChannelNotFoundError(Exception):
+    """Channel not found exception class."""
+
+    def __init__(self: "DiscordChannelNotFoundError", name: str) -> None:
+        super().__init__(f"Channel '{name}' not found")
 
 
 # pylint: disable=too-many-arguments
@@ -175,7 +178,7 @@ class DiscordGuild:
             if channel.name == name:
                 return channel.channel_id
 
-        raise DiscordGuildError(f"Channel '{name}' not found")
+        raise DiscordChannelNotFoundError(name)
 
     def create_event(self: "DiscordGuild", event: Event) -> str:
         """Creates a guild external event."""

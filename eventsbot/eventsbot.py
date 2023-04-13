@@ -160,7 +160,7 @@ def update_events(config: dict, guild: DiscordGuild) -> None:
     try:
         events = get_this_week_events(config["calendar_url"], config["default_location"])
     except requests.exceptions.RequestException as exc:
-        logger.error("Unable to load calendar %s\n%s", config["calendar_url"], exc)
+        logger.warning("Unable to load calendar %s\n%s", config["calendar_url"], exc)
         return
 
     history = load_history(config["history_path"])
@@ -273,7 +273,7 @@ def setup_from_env() -> dict:
     try:
         check_config(config, ConfigMode.ENV)
     except KeyError as exc:
-        logger.error("Invalid configuration: %s", exc.args[-1])
+        logger.warning("Invalid configuration: %s", exc.args[-1])
         return {}
 
     return config
@@ -302,7 +302,7 @@ def setup_from_cli() -> dict:
         config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
         check_config(config, ConfigMode.CLI)
     except (KeyError, OSError) as exc:
-        logger.error("Unable to load configuration file %s: %s", args.config, exc.args[-1])
+        logger.warning("Unable to load configuration file %s: %s", args.config, exc.args[-1])
         return {}
 
     config["once"] = args.once
