@@ -7,7 +7,7 @@ import re
 import signal
 import sys
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum, auto
 from types import FrameType
 from typing import Any
@@ -53,7 +53,7 @@ def get_this_week_events(url: str, default_location: str) -> list[Event]:
     ical_string = requests.get(url, timeout=DEFAULT_TIMEOUT).text
     calendar = icalendar.Calendar.from_ical(ical_string)
 
-    now = pytz.utc.localize(datetime.now(tz=datetime.timezone.utc))
+    now = datetime.now(tz=timezone.utc)
     start_date = now - timedelta(days=now.weekday())
     end_date = start_date + timedelta(days=6)
 
