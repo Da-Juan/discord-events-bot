@@ -59,7 +59,7 @@ def get_this_week_events(url: str, default_location: str) -> list[Event]:
 
     events = []
     for event in recurring_ical_events.of(calendar).between(now, end_date):
-        location = event.decoded("location") if event.decoded("location") else default_location
+        location = event.decoded("location") if event.get("location", "") else default_location
         events.append(
             Event(
                 event_id=None,
