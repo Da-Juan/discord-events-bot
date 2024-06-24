@@ -1,9 +1,9 @@
+"""Helper functions."""
 import re
 
 
 def duration_to_seconds(duration: str) -> int:
     """Convert a given duration to seconds."""
-
     units = {"d": 86400, "h": 3600, "m": 60, "s": 1}
     regex = re.compile(r"(\d+)([dhms])")
 

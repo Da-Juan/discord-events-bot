@@ -1,3 +1,4 @@
+"""Event management module."""
 import argparse
 import logging
 import os
@@ -8,35 +9,29 @@ import sys
 import time
 from datetime import datetime, timedelta
 from enum import Enum, auto
+from types import FrameType
 from typing import Any
 
 import icalendar
-
 import pytz
-
 import recurring_ical_events
-
 import requests
-
 import schedule
-
 import yaml
 
+from .constants import (
+    DEFAULT_CHANNEL,
+    DEFAULT_EVENT_LOCATION,
+    DEFAULT_INTERVAL,
+    DEFAULT_MESSAGE,
+    DEFAULT_MESSAGE_HISTORY,
+    DEFAULT_TIMEOUT,
+    DISCORD_SHORT_URL,
+    ENV_PREFIX,
+)
 from .discord import DiscordGuild, Event
+from .history import check_history, load_history, save_history
 from .utils import duration_to_seconds
-
-DEFAULT_CHANNEL = "general"
-DEFAULT_EVENT_LOCATION = "Sanata Claus Village 96930 Rovaniemi, Finland"
-DEFAULT_INTERVAL = "24h"
-DEFAULT_MESSAGE = "A new event was added"
-
-DISCORD_SHORT_URL = "https://discord.gg"
-
-ENV_PREFIX = "eventsbot_"
-
-# We cannot access return values from a scheduled function
-# The solution is to use a global variable
-ADDED_EVENTS = 0
 
 logger = logging.getLogger()
 logger.setLevel(logging.WARN)
@@ -55,31 +50,31 @@ class ConfigMode(Enum):
 
 def get_this_week_events(url: str, default_location: str) -> list[Event]:
     """Get events happening this week from an ICS calendar."""
-    ical_string = requests.get(url).text
+    ical_string = requests.get(url, timeout=DEFAULT_TIMEOUT).text
     calendar = icalendar.Calendar.from_ical(ical_string)
 
-    now = pytz.utc.localize(datetime.utcnow())
+    now = pytz.utc.localize(datetime.now(tz=datetime.timezone.utc))
     start_date = now - timedelta(days=now.weekday())
     end_date = start_date + timedelta(days=6)
 
     events = []
-    for event in recurring_ical_events.of(calendar).between(start_date, end_date):
+    for event in recurring_ical_events.of(calendar).between(now, end_date):
         location = event.decoded("location") if event.decoded("location") else default_location
         events.append(
             Event(
-                event.get("summary"),
-                event.get("description"),
-                event.decoded("dtstart").astimezone(pytz.utc).isoformat(),
-                event.decoded("dtend").astimezone(pytz.utc).isoformat(),
-                {"location": location},
-            )
+                event_id=None,
+                name=event.get("summary"),
+                description=event.get("description"),
+                start_time=event.decoded("dtstart").astimezone(pytz.utc).isoformat(),
+                end_time=event.decoded("dtend").astimezone(pytz.utc).isoformat(),
+                metadata={"location": location},
+            ),
         )
     return events
 
 
 def check_config(config: dict, mode: ConfigMode) -> None:
     """Validate the configuration dict."""
-
     mandatory_options = {"root": ["calendar_url"], "discord": ["token", "bot_url", "server_id"]}
     for key, options in mandatory_options.items():
         if key != "root" and key not in config:
@@ -99,48 +94,28 @@ def check_config(config: dict, mode: ConfigMode) -> None:
                 else:
                     msg = f"Missing '{ENV_PREFIX + option}' environment variable."
                 raise KeyError(msg)
-    optional_values = {"default_location": DEFAULT_EVENT_LOCATION, "run_interval": DEFAULT_INTERVAL}
+
+    optional_values = {
+        "default_location": DEFAULT_EVENT_LOCATION,
+        "run_interval": DEFAULT_INTERVAL,
+        "history_path": DEFAULT_MESSAGE_HISTORY,
+    }
     for key, value in optional_values.items():
         if key not in config:
             config[key] = value
 
-
-def load_config(config_path: pathlib.Path) -> dict:
-    """Load and validate the configuration file."""
-
-    with open(config_path, "r", encoding="utf-8") as config_file:
-        config = yaml.safe_load(config_file)
-
-    mandatory_options = {"root": ["calendar_url"], "discord": ["token", "bot_url", "server_id"]}
-    for key, options in mandatory_options.items():
-        if key != "root" and key not in config:
-            raise KeyError(f"Missing '{key}' in the configuration file")
-        for option in options:
-            search_dict = config
-            if key != "root":
-                search_dict = config[key]
-            if option not in search_dict:
-                raise KeyError(
-                    f"""Missing '{option}' in {"'"+key+"' section of " if key != "root" else ""}"""
-                    f"""the configuration file"""
-                )
-    optional_values = {"default_location": DEFAULT_EVENT_LOCATION, "run_interval": DEFAULT_INTERVAL}
-    for key, value in optional_values.items():
-        if key not in config:
-            config[key] = value
-    return config
+    check_history(config["history_path"])
 
 
-def signal_handler(sig: int, _) -> None:
+def signal_handler(sig: int, _: FrameType) -> None:
     """Handle signal for a clean exit."""
     logger.info("Recieved signal %s, exiting.", sig)
     schedule.clear()
     sys.exit()
 
 
-def send_message(guild: DiscordGuild, message: dict, event_id: str) -> None:
+def send_message(guild: DiscordGuild, message: dict, event_id: str) -> tuple[str, str]:
     """Send a message to announce a new event."""
-
     channel = message.get("channel", DEFAULT_CHANNEL)
 
     content = ""
@@ -153,27 +128,47 @@ def send_message(guild: DiscordGuild, message: dict, event_id: str) -> None:
         content += f" {DISCORD_SHORT_URL}/{guild.create_invite(channel)}?event={event_id}"
 
     logger.info("Sending message on channel %s.", channel)
-    guild.create_message(channel, content, message.get("mention_everyone", False))
+    return guild.create_message(channel, content, mention_everyone=message.get("mention_everyone", False))
+
+
+def cleanup_old_messages(guild: DiscordGuild, history: list[dict[str, str]]) -> list[dict[str, str]]:
+    """Delete obsolete events messages."""
+    deleted_messages = []
+    for message in history:
+        if not guild.event_id_exists(message["event_id"]):
+            guild.delete_message(message["channel_id"], message["message_id"])
+            deleted_messages.append(message)
+
+    deleted_count = len(deleted_messages)
+    if deleted_count > 0:
+        logger.info("%s obsolete message%s deleted", deleted_count, "s" if deleted_count > 1 else "")
+    return [message for message in history if message not in deleted_messages]
 
 
 def update_events(config: dict, guild: DiscordGuild) -> None:
     """Check upcoming events and create them on Discord if needed."""
-
-    global ADDED_EVENTS  # pylint: disable=global-statement
-    ADDED_EVENTS = 0
     try:
         events = get_this_week_events(config["calendar_url"], config["default_location"])
     except requests.exceptions.RequestException as exc:
-        logger.error("Unable to load calendar %s\n%s", config["calendar_url"], exc)
+        logger.warning("Unable to load calendar %s\n%s", config["calendar_url"], exc)
         return
+
+    history = load_history(config["history_path"])
 
     if not events:
         logger.info("No upcoming events found this week")
+        history = cleanup_old_messages(guild, history)
+        save_history(config["history_path"], history)
         return
 
     logger.info("Upcoming events this week:")
     for event in events:
         logger.info("\t- %s (%s - %s)", event.name, event.start_time, event.end_time)
+
+    sent_messages = []
+
+    added_events = 0
+    message_config = config["discord"].get("message", {})
 
     for event in events:
         if event in guild.events:
@@ -181,16 +176,32 @@ def update_events(config: dict, guild: DiscordGuild) -> None:
             continue
         logger.info("Creating new event %s (%s) on Discord.", event.name, event.start_time)
         event_id = guild.create_event(event)
-        ADDED_EVENTS += 1
 
-        message = config["discord"].get("message", {})
-        if message:
-            send_message(guild, message, event_id)
+        if not event_id:
+            logger.error("Unable to create event on Discord, skipping.")
+            continue
+
+        added_events += 1
+
+        if message_config:
+            message_id, channel_id = send_message(guild, message_config, event_id)
+            sent_messages.append({"event_id": event_id, "message_id": message_id, "channel_id": channel_id})
+
+    if added_events == 0:
+        msg = "All upcoming events already exist."
+    else:
+        msg = f"{added_events} new event{'s' if added_events > 1 else ''} added."
+
+    logger.info(msg)
+
+    history += sent_messages
+
+    history = cleanup_old_messages(guild, history)
+    save_history(config["history_path"], history)
 
 
-def run(config: dict) -> int:
+def run(config: dict) -> None:
     """Run the main loop."""
-
     guild = DiscordGuild(config["discord"]["token"], config["discord"]["bot_url"], config["discord"]["server_id"])
 
     schedule.every(duration_to_seconds(config["run_interval"])).seconds.do(update_events, config, guild)
@@ -199,7 +210,7 @@ def run(config: dict) -> int:
 
     if config["once"]:
         schedule.clear()
-        return ADDED_EVENTS
+        return
 
     for sig in (signal.SIGINT, signal.SIGTERM):
         signal.signal(sig, signal_handler)
@@ -207,12 +218,9 @@ def run(config: dict) -> int:
         schedule.run_pending()
         time.sleep(1)
 
-    return ADDED_EVENTS
-
 
 def get_from_env(variable: str, default: None | str = None) -> None | bool | str:
     """Check if variable exist in env then return its value."""
-
     if variable not in os.environ:
         return default
 
@@ -227,8 +235,7 @@ def get_from_env(variable: str, default: None | str = None) -> None | bool | str
 
 
 def setup_from_env() -> dict:
-    """Setup the bot using environment variables."""
-
+    """Set up the bot using environment variables."""
     config: dict[str, Any] = {"discord": {"message": {}}}
     root_variables = [
         ("default_location", DEFAULT_EVENT_LOCATION),
@@ -253,15 +260,14 @@ def setup_from_env() -> dict:
     try:
         check_config(config, ConfigMode.ENV)
     except KeyError as exc:
-        logger.error("Invalid configuration: %s", exc.args[-1])
+        logger.warning("Invalid configuration: %s", exc.args[-1])
         return {}
 
     return config
 
 
 def setup_from_cli() -> dict:
-    """Setup the bot using CLI."""
-
+    """Set up the bot using CLI."""
     parser = argparse.ArgumentParser()
     parser.add_argument("config", type=pathlib.Path, help="Path to YAML configuration file")
     parser.add_argument("-d", "--debug", action="store_true", help="Run in debug mode")
@@ -278,11 +284,11 @@ def setup_from_cli() -> dict:
         logger.debug("Starting in debug mode...")
 
     try:
-        with open(args.config, "r", encoding="utf-8") as config_file:
-            config = yaml.safe_load(config_file)
+        config_path = pathlib.Path(args.config)
+        config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
         check_config(config, ConfigMode.CLI)
     except (KeyError, OSError) as exc:
-        logger.error("Unable to load configuration file %s: %s", args.config, exc.args[-1])
+        logger.warning("Unable to load configuration file %s: %s", args.config, exc.args[-1])
         return {}
 
     config["once"] = args.once
@@ -293,14 +299,11 @@ def setup_from_cli() -> dict:
 def cli() -> None:
     """Run the bot from CLI."""
     config = setup_from_cli()
+
     if not config:
         sys.exit(1)
-    count = run(config)
-    if count == 0:
-        msg = "All upcoming events already exist."
-    else:
-        msg = f"{count} new event{'s' if count > 1 else ''} added."
-    logger.info(msg)
+
+    run(config)
 
 
 if __name__ == "__main__":
