@@ -23,6 +23,7 @@ types-requests = "*"
 types-pyyaml = "*"
 types-pytz = "*"
 scaleway-functions-python = "*"
+ruff = "*"
 
 [requires]
 python_version = "3.10"
