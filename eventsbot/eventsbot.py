@@ -30,7 +30,7 @@ from .constants import (
     ENV_PREFIX,
 )
 from .discord import DiscordGuild, Event
-from .history import check_history, load_history, save_history
+from .history import FileHistory, History
 from .utils import duration_to_seconds
 
 logger = logging.getLogger()
@@ -98,13 +98,11 @@ def check_config(config: dict, mode: ConfigMode) -> None:
     optional_values = {
         "default_location": DEFAULT_EVENT_LOCATION,
         "run_interval": DEFAULT_INTERVAL,
-        "history_path": DEFAULT_MESSAGE_HISTORY,
+        "history": DEFAULT_MESSAGE_HISTORY,
     }
     for key, value in optional_values.items():
         if key not in config:
             config[key] = value
-
-    check_history(config["history_path"])
 
 
 def signal_handler(sig: int, _: FrameType) -> None:
@@ -131,21 +129,20 @@ def send_message(guild: DiscordGuild, message: dict, event_id: str) -> tuple[str
     return guild.create_message(channel, content, mention_everyone=message.get("mention_everyone", False))
 
 
-def cleanup_old_messages(guild: DiscordGuild, history: list[dict[str, str]]) -> list[dict[str, str]]:
+def cleanup_old_messages(guild: DiscordGuild, history: History) -> None:
     """Delete obsolete events messages."""
-    deleted_messages = []
-    for message in history:
+    deleted_count = 0
+    for message in history.history:
         if not guild.event_id_exists(message["event_id"]):
             guild.delete_message(message["channel_id"], message["message_id"])
-            deleted_messages.append(message)
+            history.history.remove(message)
+            deleted_count += 1
 
-    deleted_count = len(deleted_messages)
     if deleted_count > 0:
         logger.info("%s obsolete message%s deleted", deleted_count, "s" if deleted_count > 1 else "")
-    return [message for message in history if message not in deleted_messages]
 
 
-def update_events(config: dict, guild: DiscordGuild) -> None:
+def update_events(config: dict, guild: DiscordGuild, history: History) -> None:
     """Check upcoming events and create them on Discord if needed."""
     try:
         events = get_this_week_events(config["calendar_url"], config["default_location"])
@@ -153,12 +150,10 @@ def update_events(config: dict, guild: DiscordGuild) -> None:
         logger.warning("Unable to load calendar %s\n%s", config["calendar_url"], exc)
         return
 
-    history = load_history(config["history_path"])
-
     if not events:
         logger.info("No upcoming events found this week")
-        history = cleanup_old_messages(guild, history)
-        save_history(config["history_path"], history)
+        cleanup_old_messages(guild, history)
+        history.save()
         return
 
     logger.info("Upcoming events this week:")
@@ -194,17 +189,23 @@ def update_events(config: dict, guild: DiscordGuild) -> None:
 
     logger.info(msg)
 
-    history += sent_messages
+    history.history += sent_messages
 
-    history = cleanup_old_messages(guild, history)
-    save_history(config["history_path"], history)
+    cleanup_old_messages(guild, history)
+    history.save()
 
 
 def run(config: dict) -> None:
     """Run the main loop."""
     guild = DiscordGuild(config["discord"]["token"], config["discord"]["bot_url"], config["discord"]["server_id"])
 
-    schedule.every(duration_to_seconds(config["run_interval"])).seconds.do(update_events, config, guild)
+    match config["history"]["driver"]:
+        case "file":
+            history = FileHistory(config["history"]["path"])
+        case _:
+            history = FileHistory(config["history"]["path"])
+
+    schedule.every(duration_to_seconds(config["run_interval"])).seconds.do(update_events, config, guild, history)
     # Run the job now
     schedule.run_all()
 
