@@ -1,6 +1,7 @@
 # Discord events bot
 
 This bot imports automatically events from an iCal calendar into Discord and, optionally, sends a message to inform the server's users about the event.
+It also automatically deletes the messages posted about finished events.
 
 ## Pre-requisites
 
@@ -47,10 +48,16 @@ The bot reads a calendar in iCal format, here are the steps to get the URL for a
 ## Usage
 
 Copy `example_config.yaml` as `config.yaml` and adapt it with your settings.  
-Run the bot with Docker:
+
+Only on the first run, create the Docker volume and set its permissions:
+```
+docker run --rm --user 0 --mount type=volume,source=eventsbot,target=/home/bot/.eventsbot --entrypoint /bin/chown nrouanet/eventsbot 1000:1000 /home/bot/.eventsbot
+```
+
+Then, run the bot with Docker:
 
 ```bash
-docker run -d --name eventsbot --mount type=bind,source=<absolute_path_to_config.yaml>,target=/config.yaml,readonly nrouanet/eventsbot
+docker run -d --name eventsbot --restart always --mount type=bind,source=<absolute_path_to_config.yaml>,target=/config.yaml,readonly --mount type=volume,source=eventsbot,target=/home/bot/.eventsbot nrouanet/eventsbot
 ```
 
 ## References
@@ -80,6 +87,7 @@ This is an early test feature.
 | `eventsbot_default_location` | `default_location`                 |
 | `eventsbot_calendar_url`     | `calendar_url`                     |
 | `eventsbot_run_interval`     | `run_interval`                     |
+| `eventsbot_history_path`     | `history_path`                     |
 | `eventsbot_token`            | `discord.token`                    |
 | `eventsbot_bot_url`          | `discord.bot_url`                  |
 | `eventsbot_server_id`        | `discord.server_id`                |

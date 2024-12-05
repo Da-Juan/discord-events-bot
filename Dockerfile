@@ -30,7 +30,7 @@ COPY --from=python-deps /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH"
 
 # Create and switch to a new user
-RUN useradd --create-home bot
+RUN groupadd --gid 1000 bot && useradd --gid 1000 --uid 1000 --create-home bot
 WORKDIR /home/bot
 
 USER bot
